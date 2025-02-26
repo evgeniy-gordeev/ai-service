@@ -16,6 +16,7 @@ from src.logger_config import setup_logger
 from src.models import ModelFactory, ModelType, BaseEmbeddingModel
 import numpy as np
 from src.database import Database
+from src.search_utils import search, angular_distance_to_similarity, rrf_rank, search_faster, simple_rank
 
 logger = setup_logger(__name__)
 model = ModelFactory.get_model(ModelType.roberta)
@@ -76,14 +77,6 @@ class TenderSearchResult(BaseModel):
     region: Optional[str]
     similarity_score: float
 
-def angular_distance_to_similarity(distance: float) -> float:
-    """
-    Convert angular distance to similarity score.
-    For angular distance, similarity = cos(θ) = 1 - distance
-    Normalizes to range [0, 1]
-    """
-    similarity = 1 - (distance / 2)  # Convert angular distance to cosine similarity
-    return max(0.0, min(1.0, similarity))  # Ensure score is between 0 and 1
 
 def create_tender_embeddings(tenders_summary_path: str, model: BaseEmbeddingModel):
     """Create embeddings for tenders using the specified model."""
@@ -160,6 +153,7 @@ async def api_download_tenders(request: TenderDownloadRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading tenders: {str(e)}")
 
+
 @app.post("/search-tenders/",
           response_model=List[TenderSearchResult])
 async def api_search_tenders(request: TenderSearchRequest):
@@ -169,18 +163,6 @@ async def api_search_tenders(request: TenderSearchRequest):
     # Parse the query 
     parsed_query = parse_query(request.query)
     logger.info(f"Parsed query={parsed_query}")
-    '''parsed_query = {
-        "query": request.query,
-        "region": "78",
-        "date": "2024-10-01",
-        "document": None,
-        "инн": None,
-        "заказчик": None,
-        "min_price": 100_000,
-        "max_price": 1_000_000,
-        "type": "Электронный аукцион",
-        "окпд2": None
-    }'''
     
     # Log parsed query parameters
     logger.debug(f"Parsed query parameters: {parsed_query}")
@@ -195,54 +177,38 @@ async def api_search_tenders(request: TenderSearchRequest):
         purchase_method=parsed_query.get("type"),
         okpd2_code=parsed_query.get("окпд2"),
         customer_inn=parsed_query.get("инн"),
-        customer_name=parsed_query.get("заказчик")
     )
+    
+    print(tenders[0]['vector_customer_name'].shape)
     
     # Log number of filtered tenders
     logger.info(f"Number of filtered tenders: {len(tenders)}")
     
-    # Generate query embedding
-    query_vector = model.get_embeddings([parsed_query['query']])[0]
+    logger.info(f"Start search by name: {parsed_query['query']}")
+    nearest_indices_by_name = search_faster(parsed_query['query'], tenders, 'vector', request.top_k, model)
+    
+    if parsed_query['заказчик'] is not None:
+        logger.info(f"Start search by customer: {parsed_query['заказчик']}")
+        nearest_indices_by_customer_name = search_faster(parsed_query['заказчик'], tenders, 'vector_customer_name', len(tenders) // 2, model)
+    
+        # RRF rank
+        nearest_indices = rrf_rank(nearest_indices_by_name[0], 
+                                   nearest_indices_by_name[1], 
+                                   nearest_indices_by_customer_name[0], 
+                                   nearest_indices_by_customer_name[1], 
+                                   k=60)
+        #nearest_indices = simple_rank(nearest_indices_by_name[0], 
+        #                              nearest_indices_by_customer_name[0])
+    else:
+        nearest_indices = nearest_indices_by_name
+    
 
-    
-    # Create Annoy index dynamically
-    annoy_index = AnnoyIndex(model.embedding_dim, 'angular')
-    
-    # Store metadata to map index to tender details
-    tenders_metadata = {}
-    
-    # Generate embeddings for filtered tenders
-    valid_tenders_count = 0
-    for i, tender in enumerate(tenders):
-        # Use pre-computed vector if available, otherwise compute
-        if tender['vector'] is not None:
-            tender_vector = tender['vector']
-            
-            # Add to Annoy index
-            annoy_index.add_item(i, tender_vector)
-            valid_tenders_count += 1
-        else:
-            logger.debug(f"Skipping tender {tender['id']} due to missing vector")
-
-    # Log number of tenders with valid vectors
-    logger.info(f"Number of tenders with valid vectors: {valid_tenders_count}")
-
-    # Build the index
-    annoy_index.build(10)  # 10 trees for index construction
-    
-    # Find nearest neighbors
-    nearest_indices = annoy_index.get_nns_by_vector(
-        query_vector, 
-        request.top_k, 
-        include_distances=True
-    )
-
-    
     # Prepare search results
     search_results = []
-    for idx, distance in zip(nearest_indices[0], nearest_indices[1]):
+    i = 0
+    for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
         tender = tenders[idx]
-        similarity_score = angular_distance_to_similarity(distance)
+        #similarity_score = distance # angular_distance_to_similarity(distance)
         
         search_results.append(TenderSearchResult(
             id=tender['id'],
@@ -258,6 +224,9 @@ async def api_search_tenders(request: TenderSearchRequest):
             region=tender['region'],
             similarity_score=similarity_score
         ))
+        i += 1
+        if i == request.top_k:
+            break
     
     # Log search results
     logger.info(f"Returning {len(search_results)} similar tenders")

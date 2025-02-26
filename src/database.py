@@ -47,7 +47,8 @@ class Database:
                     
                     region TEXT NOT NULL,
                     date_added TEXT NOT NULL,
-                    vector BLOB
+                    vector BLOB,
+                    vector_customer_name BLOB
                 )
             """)
             
@@ -140,7 +141,7 @@ class Database:
                     id, name, price, law_type, purchase_method, 
                     okpd2_code, publish_date, end_date, 
                     customer_inn, customer_name, 
-                    region, date_added, vector
+                    region, date_added, vector, vector_customer_name
                 FROM tenders 
                 WHERE 1=1
             """
@@ -164,11 +165,11 @@ class Database:
             # Add price filters if provided
             if min_price is not None:
                 query += " AND price >= ?"
-                params.append(min_price)
+                params.append(int(min_price))
             
             if max_price is not None:
                 query += " AND price <= ?"
-                params.append(max_price)
+                params.append(int(max_price))
             
             # Add law_type filter if provided
             if law_type is not None:
@@ -196,7 +197,7 @@ class Database:
             # Add customer_inn filter if provided
             if customer_inn is not None:
                 query += " AND customer_inn = ?"
-                params.extend(customer_inn)
+                params.append(customer_inn)
             
             # Execute the query
             cursor.execute(query, params)
@@ -215,7 +216,8 @@ class Database:
                     'customer_name': row[9],
                     'region': row[10],
                     'date_added': row[11],
-                    'vector': np.frombuffer(row[12], dtype=np.float32) if row[12] is not None else None
+                    'vector': np.frombuffer(row[12], dtype=np.float32) if row[12] is not None else None,
+                    'vector_customer_name': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None
                 }
                 for row in cursor.fetchall()
             ]
