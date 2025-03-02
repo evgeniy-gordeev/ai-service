@@ -1,5 +1,5 @@
-# Этап сборки
-FROM node:16-alpine as build
+# Этап сборки - используем более новую версию Node
+FROM node:18-alpine as build
 
 WORKDIR /app
 
