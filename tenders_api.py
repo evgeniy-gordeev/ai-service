@@ -158,11 +158,26 @@ async def api_download_tenders(request: TenderDownloadRequest):
           response_model=List[TenderSearchResult])
 async def api_search_tenders(request: TenderSearchRequest):
     # Log the incoming search request
-    logger.info(f"Received search request: query='{request.query}', top_k={request.top_k}")
+    logger.info(f"Received search request: query length={len(request.query)}, top_k={request.top_k}")
+    
+    # Truncate query if it's too long
+    max_query_length = 512  # Adjust based on your model's limitations
+    query = request.query[:max_query_length] if len(request.query) > max_query_length else request.query
+    
+    if len(query) < len(request.query):
+        logger.warning(f"Query truncated from {len(request.query)} to {len(query)} characters")
     
     # Parse the query 
-    parsed_query = parse_query(request.query)
+    parsed_query = parse_query(query)
     logger.info(f"Parsed query={parsed_query}")
+    
+    # Ensure parsed_query has the required keys
+    if not isinstance(parsed_query, dict):
+        parsed_query = {"query": query}
+    if "query" not in parsed_query or not parsed_query["query"]:
+        parsed_query["query"] = query
+    if "заказчик" not in parsed_query:
+        parsed_query["заказчик"] = None
     
     # Log parsed query parameters
     logger.debug(f"Parsed query parameters: {parsed_query}")
@@ -179,54 +194,64 @@ async def api_search_tenders(request: TenderSearchRequest):
         customer_inn=parsed_query.get("инн"),
     )
     
-    print(tenders[0]['vector_customer_name'].shape)
+    if not tenders:
+        logger.warning("No tenders found after filtering")
+        return []
     
-    # Log number of filtered tenders
     logger.info(f"Number of filtered tenders: {len(tenders)}")
     
-    logger.info(f"Start search by name: {parsed_query['query']}")
-    nearest_indices_by_name = search_faster(parsed_query['query'], tenders, 'vector', request.top_k, model)
-    
-    if parsed_query['заказчик'] is not None:
-        logger.info(f"Start search by customer: {parsed_query['заказчик']}")
-        nearest_indices_by_customer_name = search_faster(parsed_query['заказчик'], tenders, 'vector_customer_name', len(tenders) // 2, model)
-    
-        # RRF rank
-        nearest_indices = rrf_rank(nearest_indices_by_name[0], 
-                                   nearest_indices_by_name[1], 
-                                   nearest_indices_by_customer_name[0], 
-                                   nearest_indices_by_customer_name[1], 
-                                   k=60)
-        #nearest_indices = simple_rank(nearest_indices_by_name[0], 
-        #                              nearest_indices_by_customer_name[0])
-    else:
-        nearest_indices = nearest_indices_by_name
-    
+    # Use a try-except block for the search operation
+    try:
+        logger.info(f"Start search by name: {parsed_query['query']}")
+        nearest_indices_by_name = search_faster(parsed_query['query'], tenders, 'vector', request.top_k, model)
+        
+        if parsed_query['заказчик'] is not None:
+            logger.info(f"Start search by customer: {parsed_query['заказчик']}")
+            nearest_indices_by_customer_name = search_faster(parsed_query['заказчик'], tenders, 'vector_customer_name', len(tenders) // 2, model)
+        
+            # RRF rank
+            nearest_indices = rrf_rank(nearest_indices_by_name[0], 
+                                    nearest_indices_by_name[1], 
+                                    nearest_indices_by_customer_name[0], 
+                                    nearest_indices_by_customer_name[1], 
+                                    k=60)
+        else:
+            nearest_indices = nearest_indices_by_name
+    except Exception as e:
+        logger.error(f"Error during search: {str(e)}")
+        # Fallback to a simpler search or return empty results
+        return []
 
     # Prepare search results
     search_results = []
     i = 0
     for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
+        if idx >= len(tenders):
+            continue
+            
         tender = tenders[idx]
-        #similarity_score = distance # angular_distance_to_similarity(distance)
         
-        search_results.append(TenderSearchResult(
-            id=tender['id'],
-            name=tender['name'],
-            price=tender['price'],
-            law_type=tender['law_type'],
-            purchase_method=tender['purchase_method'],
-            okpd2_code=tender['okpd2_code'],
-            publish_date=tender['publish_date'],
-            end_date=tender['end_date'],
-            customer_inn=tender['customer_inn'],
-            customer_name=tender['customer_name'],
-            region=tender['region'],
-            similarity_score=similarity_score
-        ))
-        i += 1
-        if i == request.top_k:
-            break
+        try:
+            search_results.append(TenderSearchResult(
+                id=tender['id'],
+                name=tender['name'],
+                price=float(tender['price']),
+                law_type=tender.get('law_type'),
+                purchase_method=tender.get('purchase_method'),
+                okpd2_code=tender.get('okpd2_code'),
+                publish_date=tender.get('publish_date'),
+                end_date=tender.get('end_date'),
+                customer_inn=tender.get('customer_inn'),
+                customer_name=tender.get('customer_name'),
+                region=tender.get('region'),
+                similarity_score=float(similarity_score)
+            ))
+            i += 1
+            if i == request.top_k:
+                break
+        except Exception as e:
+            logger.error(f"Error creating search result for tender {tender.get('id', 'unknown')}: {str(e)}")
+            continue
     
     # Log search results
     logger.info(f"Returning {len(search_results)} similar tenders")
@@ -238,5 +263,8 @@ if __name__ == "__main__":
         "tenders_api:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=True,
+        limit_request_line=0,  # No limit
+        limit_request_fields=0,  # No limit
+        limit_request_field_size=0  # No limit
     )

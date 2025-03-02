@@ -1,0 +1,52 @@
+.tender-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tender-id {
+  display: inline-block;
+  background-color: #e3f2fd;
+  color: #2196F3;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.tender-title {
+  font-size: 18px;
+  color: #333;
+  font-weight: 500;
+  margin: 0 0 15px 0;
+}
+
+.tender-details {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.tender-date, .tender-price, .tender-customer {
+  display: flex;
+  align-items: center;
+}
+
+/* Иконки */
+.calendar-icon::before {
+  content: "📅";
+  margin-right: 5px;
+}
+
+.price-icon::before {
+  content: "💰";
+  margin-right: 5px;
+}
+
+.building-icon::before {
+  content: "🏢";
+  margin-right: 5px;
+} 

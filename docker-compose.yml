@@ -4,11 +4,28 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./resources:/app/resources  # Mount parent resources directory
     environment:
       - PYTHONUNBUFFERED=1  # For better logging
+    networks:
+      - tenders-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+    environment:
+      - REACT_APP_API_URL=http://api:8001
+      - REACT_APP_IN_DOCKER=true
+    networks:
+      - tenders-network
     restart: unless-stopped
 
 networks:
