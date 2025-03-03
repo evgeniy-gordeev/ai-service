@@ -2,13 +2,28 @@ version: '3.8'
 
 services:
   api:
-    build: .
+    build:
+      context: .
+      target: runtime
+      dockerfile: Dockerfile
     ports:
       - "8001:8001"
     volumes:
-      - ./resources:/app/resources  # Mount parent resources directory
+      - ./resources:/app/resources
     environment:
-      - PYTHONUNBUFFERED=1  # For better logging
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 30G
     networks:
       - tenders-network
     restart: unless-stopped
@@ -16,6 +31,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: production
       dockerfile: Dockerfile
     ports:
       - "3001:80"
@@ -24,9 +40,20 @@ services:
     environment:
       - REACT_APP_API_URL=http://api:8001
       - REACT_APP_IN_DOCKER=true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
     networks:
       - tenders-network
     restart: unless-stopped
+
 
 networks:
   tenders-network:

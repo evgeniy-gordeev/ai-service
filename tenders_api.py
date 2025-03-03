@@ -2,9 +2,8 @@ import os
 import json
 from typing import List, Optional
 from datetime import datetime
-import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from annoy import AnnoyIndex
 from src.chat_gpt import parse_query
@@ -77,6 +76,10 @@ class TenderSearchResult(BaseModel):
     region: Optional[str]
     similarity_score: float
 
+class SearchRequest(BaseModel):
+    query: str
+    region: str = None
+    top_k: int = 10
 
 def create_tender_embeddings(tenders_summary_path: str, model: BaseEmbeddingModel):
     """Create embeddings for tenders using the specified model."""
@@ -153,110 +156,118 @@ async def api_download_tenders(request: TenderDownloadRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading tenders: {str(e)}")
 
-
-@app.post("/search-tenders/",
-          response_model=List[TenderSearchResult])
-async def api_search_tenders(request: TenderSearchRequest):
-    # Log the incoming search request
-    logger.info(f"Received search request: query length={len(request.query)}, top_k={request.top_k}")
+@app.post("/search-tenders/")
+async def search_tenders(request: SearchRequest):
+    """
+    Эндпоинт для поиска тендеров
     
-    # Truncate query if it's too long
-    max_query_length = 512  # Adjust based on your model's limitations
-    query = request.query[:max_query_length] if len(request.query) > max_query_length else request.query
-    
-    if len(query) < len(request.query):
-        logger.warning(f"Query truncated from {len(request.query)} to {len(query)} characters")
-    
-    # Parse the query 
-    parsed_query = parse_query(query)
-    logger.info(f"Parsed query={parsed_query}")
-    
-    # Ensure parsed_query has the required keys
-    if not isinstance(parsed_query, dict):
-        parsed_query = {"query": query}
-    if "query" not in parsed_query or not parsed_query["query"]:
-        parsed_query["query"] = query
-    if "заказчик" not in parsed_query:
-        parsed_query["заказчик"] = None
-    
-    # Log parsed query parameters
-    logger.debug(f"Parsed query parameters: {parsed_query}")
-    
-    # Filter tenders based on parsed query parameters
-    tenders = db.get_tenders(
-        region=parsed_query.get("region"),
-        date=parsed_query.get("date"),
-        min_price=parsed_query.get("min_price"),
-        max_price=parsed_query.get("max_price"),
-        law_type=parsed_query.get("document"),
-        purchase_method=parsed_query.get("type"),
-        okpd2_code=parsed_query.get("окпд2"),
-        customer_inn=parsed_query.get("инн"),
-    )
-    
-    if not tenders:
-        logger.warning("No tenders found after filtering")
-        return []
-    
-    logger.info(f"Number of filtered tenders: {len(tenders)}")
-    
-    # Use a try-except block for the search operation
+    Args:
+        request: Тело запроса с параметрами поиска
+        
+    Returns:
+        list: Список найденных тендеров
+    """
     try:
-        logger.info(f"Start search by name: {parsed_query['query']}")
-        nearest_indices_by_name = search_faster(parsed_query['query'], tenders, 'vector', request.top_k, model)
+        # Анализируем запрос с помощью GigaChat, передаем регион если он указан
+        parsed_data = parse_query(request.query, region_code=request.region)
         
-        if parsed_query['заказчик'] is not None:
-            logger.info(f"Start search by customer: {parsed_query['заказчик']}")
-            nearest_indices_by_customer_name = search_faster(parsed_query['заказчик'], tenders, 'vector_customer_name', len(tenders) // 2, model)
+        # Логируем распарсенные данные
+        logger.info(f"Parsed query: {parsed_data}")
         
-            # RRF rank
-            nearest_indices = rrf_rank(nearest_indices_by_name[0], 
-                                    nearest_indices_by_name[1], 
-                                    nearest_indices_by_customer_name[0], 
-                                    nearest_indices_by_customer_name[1], 
-                                    k=60)
+        # Убедимся, что в parsed_data есть все необходимые ключи
+        if not isinstance(parsed_data, dict):
+            parsed_data = {"query": request.query}
+        if "query" not in parsed_data or not parsed_data["query"]:
+            parsed_data["query"] = request.query
+        if "заказчик" not in parsed_data:
+            parsed_data["заказчик"] = None
+        
+        # Фильтруем тендеры по параметрам из запроса
+        tenders = db.get_tenders(
+            region=parsed_data.get("region"),
+            date=parsed_data.get("date"),
+            min_price=parsed_data.get("min_price"),
+            max_price=parsed_data.get("max_price"),
+            law_type=parsed_data.get("document"),
+            purchase_method=parsed_data.get("type"),
+            okpd2_code=parsed_data.get("окпд2"),
+            customer_inn=parsed_data.get("инн"),
+        )
+        
+        if not tenders:
+            logger.warning("Не найдено тендеров после фильтрации")
+            return []
+        
+        logger.info(f"Найдено тендеров после фильтрации: {len(tenders)}")
+        
+        # Выполняем поиск по названию
+        nearest_indices_by_name = search_faster(
+            parsed_data['query'], 
+            tenders, 
+            'vector', 
+            request.top_k, 
+            model
+        )
+        
+        # Если указан заказчик, ищем и по заказчику
+        if parsed_data['заказчик'] is not None:
+            logger.info(f"Поиск по заказчику: {parsed_data['заказчик']}")
+            nearest_indices_by_customer_name = search_faster(
+                parsed_data['заказчик'], 
+                tenders, 
+                'vector_customer_name', 
+                len(tenders) // 2, 
+                model
+            )
+            
+            # Выполняем ранжирование по RRF
+            nearest_indices = rrf_rank(
+                nearest_indices_by_name[0], 
+                nearest_indices_by_name[1], 
+                nearest_indices_by_customer_name[0], 
+                nearest_indices_by_customer_name[1], 
+                k=60
+            )
         else:
             nearest_indices = nearest_indices_by_name
-    except Exception as e:
-        logger.error(f"Error during search: {str(e)}")
-        # Fallback to a simpler search or return empty results
-        return []
-
-    # Prepare search results
-    search_results = []
-    i = 0
-    for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
-        if idx >= len(tenders):
-            continue
-            
-        tender = tenders[idx]
         
-        try:
-            search_results.append(TenderSearchResult(
-                id=tender['id'],
-                name=tender['name'],
-                price=float(tender['price']),
-                law_type=tender.get('law_type'),
-                purchase_method=tender.get('purchase_method'),
-                okpd2_code=tender.get('okpd2_code'),
-                publish_date=tender.get('publish_date'),
-                end_date=tender.get('end_date'),
-                customer_inn=tender.get('customer_inn'),
-                customer_name=tender.get('customer_name'),
-                region=tender.get('region'),
-                similarity_score=float(similarity_score)
-            ))
-            i += 1
-            if i == request.top_k:
-                break
-        except Exception as e:
-            logger.error(f"Error creating search result for tender {tender.get('id', 'unknown')}: {str(e)}")
-            continue
-    
-    # Log search results
-    logger.info(f"Returning {len(search_results)} similar tenders")
-    
-    return search_results
+        # Подготавливаем результаты поиска
+        results = []
+        i = 0
+        for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
+            if idx >= len(tenders):
+                continue
+                
+            tender = tenders[idx]
+            
+            try:
+                results.append({
+                    'id': tender['id'],
+                    'name': tender['name'],
+                    'price': float(tender['price']) if tender['price'] else 0,
+                    'law_type': tender.get('law_type'),
+                    'purchase_method': tender.get('purchase_method'),
+                    'okpd2_code': tender.get('okpd2_code'),
+                    'publish_date': tender.get('publish_date'),
+                    'end_date': tender.get('end_date'),
+                    'customer_inn': tender.get('customer_inn'),
+                    'customer_name': tender.get('customer_name'),
+                    'region': tender.get('region'),
+                    'similarity_score': float(similarity_score)
+                })
+                i += 1
+                if i == request.top_k:
+                    break
+            except Exception as e:
+                logger.error(f"Ошибка создания результата для тендера {tender.get('id', 'unknown')}: {str(e)}")
+                continue
+        
+        logger.info(f"Возвращаем {len(results)} похожих тендеров")
+        
+        return results
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка обработки запроса: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

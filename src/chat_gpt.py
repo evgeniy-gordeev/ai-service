@@ -1,6 +1,5 @@
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
-from openai import OpenAI
 import json
 
 
@@ -58,7 +57,18 @@ PROMPT_FOR_REGION = """Извлеки код региона.
 Напечатай только код региона.
 """
 
-def parse_query(SEARCH_QUERY):
+def parse_query(SEARCH_QUERY, region_code=None, region_name=None):
+    """
+    Анализ поискового запроса и извлечение атрибутов с помощью GigaChat
+    
+    Args:
+        SEARCH_QUERY (str): Строка поискового запроса
+        region_code (str, optional): Код региона, если он был выбран на фронтенде
+        region_name (str, optional): Название региона, если оно было выбрано на фронтенде
+        
+    Returns:
+        dict: Словарь с атрибутами поиска
+    """
     payload = Chat(
         messages=[
             Messages(
@@ -74,43 +84,25 @@ def parse_query(SEARCH_QUERY):
     response = giga.chat(payload)
     print(response.choices[0].message.content)
 
-    # client = OpenAI(api_key = "sk-932d7d920e77485fb7f455cbc5e8e87b", base_url = 'https://api.deepseek.com')
-    # response = client.chat.completions.create(
-    #     model="deepseek-chat",
-    #     messages=[
-    #         {
-    #         "role": "system",
-    #         "content": [
-    #             {
-    #             "type": "text",
-    #             "text": PROMPT
-    #             }
-    #         ]
-    #         },
-    #         {
-    #         "role": "user",
-    #         "content": [
-    #             {
-    #             "type": "text",
-    #             "text": SEARCH_QUERY
-    #             }
-    #         ]
-    #         }    
-    #     ],
-    # response_format={
-    #     "type": "json_object"
-    # },
-    # )
+    # Парсим JSON из ответа GigaChat
     data = json.loads(response.choices[0].message.content)
+    
+    # Преобразуем "null" в None
     for key, value in data.items():
         if value == "null":
             data[key] = None
     
-    if 'region' in data and data["region"] is not None:
+    # Если регион был передан явно, используем его
+    if region_code:
+        data["region"] = region_code
+    # Иначе, если в данных есть регион, пытаемся получить его код
+    elif 'region' in data and data["region"] is not None:
         data["region"] = parse_region(data["region"])
     
+    # Преобразуем заказчика в верхний регистр, если он есть
     if 'заказчик' in data and data["заказчик"] is not None:
         data["заказчик"] = data["заказчик"].upper()
+    
     return data
 
 

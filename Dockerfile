@@ -1,33 +1,40 @@
-FROM python:3.9-slim
+FROM python:3.9-slim as builder
 
 WORKDIR /app
 
-# Установка системных зависимостей
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+# Установка только необходимых системных зависимостей
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Создание и активация виртуального окружения
+# Создание виртуального окружения
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Копирование файлов зависимостей
+# Копирование только файла requirements
 COPY requirements.txt .
 
-# Установка PyTorch и зависимостей в виртуальное окружение
-RUN . /opt/venv/bin/activate && \
-    pip install --no-cache-dir torch  --index-url https://download.pytorch.org/whl/cpu && \
+# Установка зависимостей с оптимизацией
+RUN pip install --no-cache-dir -U pip setuptools wheel && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
-# Создаем директорию для монтирования модели
-RUN mkdir -p /app/resources
+# Финальный образ
+FROM python:3.9-slim as runtime
 
-# Копирование исходного кода (без resources)
-COPY . .
+WORKDIR /app
+
+# Копирование виртуального окружения из предыдущего этапа
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+
+# Копируем только необходимые файлы приложения
+COPY src/ /app/src/
+COPY tenders_api.py /app/
 
 # Открываем порт
 EXPOSE 8001
 
-# Запуск приложения через uvicorn
-CMD ["/opt/venv/bin/uvicorn", "tenders_api:app", "--host", "0.0.0.0", "--port", "8001"]
+# Запуск приложения через uvicorn с настройками производительности
+CMD ["uvicorn", "tenders_api:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
