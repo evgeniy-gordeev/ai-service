@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sys
 import uuid
 import requests
 import zipfile
@@ -10,10 +11,13 @@ import io
 import xml.etree.ElementTree as ET
 from tqdm import tqdm
 from annoy import AnnoyIndex
+# Fix the imports to handle both package and direct script execution
+
 from src.logger_config import setup_logger
 from src.models import ModelFactory, ModelType
 from src.database import Database
-import os
+
+
 
 logger = setup_logger(__name__)
 
@@ -243,7 +247,7 @@ def get_tenders_info(files_content):
 
 
 def download_tenders(regions, start_date, end_date, save_xml):
-    db = Database()
+    db = Database(db_path='resources/tenders_1to9.db')
     
     current_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -257,7 +261,7 @@ def download_tenders(regions, start_date, end_date, save_xml):
         date_str = current_date.strftime('%Y-%m-%d')
 
         for region in regions:
-            existing_tenders = db.get_tenders_by_region_date(region, date_str)
+            existing_tenders = db.get_tenders(region, date_str)
             if existing_tenders:
                 logger.info(f"Region {region} date {date_str} already exists, skipping...")
                 continue
@@ -355,7 +359,8 @@ def main():
 
     all_regions = range(1, 100)
     all_regions = [str(el) for el in all_regions]
-    download_tenders(args.regions, args.start_date, args.end_date, args.save_xml)
+    all_regions = ['01', '02', '03', '04', '05', '06', '07', '08', '09']
+    download_tenders(all_regions, args.start_date, args.end_date, args.save_xml)
 
     if args.vectorize:
         create_tender_embeddings(

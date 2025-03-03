@@ -6,6 +6,8 @@ import { searchTenders } from './services/api';
 
 // Константа для ключа localStorage
 const STORAGE_KEY = 'tenders_search_tabs';
+// Константа для таймаута поиска (10 секунд)
+const SEARCH_TIMEOUT = 10000;
 
 function App() {
   // Загружаем вкладки из localStorage или используем значение по умолчанию
@@ -13,11 +15,11 @@ function App() {
     try {
       const savedTabs = localStorage.getItem(STORAGE_KEY);
       return savedTabs ? JSON.parse(savedTabs) : [
-        { id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null }
+        { id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null }
       ];
     } catch (error) {
       console.error('Ошибка при загрузке данных из localStorage:', error);
-      return [{ id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null }];
+      return [{ id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null }];
     }
   });
   
@@ -52,28 +54,45 @@ function App() {
   }, [activeTabId]);
 
   const fetchTenders = useCallback(async (query, tabId, region) => {
+    // Сбрасываем состояние ошибки при начале нового поиска
     setTabs(prevTabs => 
       prevTabs.map(tab => 
-        tab.id === tabId ? { ...tab, loading: true } : tab
+        tab.id === tabId ? { ...tab, loading: true, error: null } : tab
       )
     );
 
+    // Устанавливаем таймаут
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Время поиска истекло. Попробуйте снова или измените запрос.'));
+      }, SEARCH_TIMEOUT);
+    });
+
     try {
-      // Передаем код региона в API
-      const data = await searchTenders(query, region.code);
+      // Используем Promise.race для конкуренции между фактическим запросом и таймаутом
+      const data = await Promise.race([
+        searchTenders(query, region.code),
+        timeoutPromise
+      ]);
       
       setTabs(prevTabs => 
         prevTabs.map(tab => 
           tab.id === tabId ? 
-            { ...tab, tenders: data, loading: false, searchTerm: query, selectedRegion: region } : 
+            { ...tab, tenders: data, loading: false, searchTerm: query, selectedRegion: region, error: null } : 
             tab
         )
       );
     } catch (error) {
-      console.error('Failed to fetch tenders:', error);
+      console.error('Ошибка поиска тендеров:', error);
+      
+      // Обрабатываем ошибку и обновляем состояние
       setTabs(prevTabs => 
         prevTabs.map(tab => 
-          tab.id === tabId ? { ...tab, loading: false } : tab
+          tab.id === tabId ? { 
+            ...tab, 
+            loading: false, 
+            error: error.message || 'Произошла ошибка при поиске тендеров.'
+          } : tab
         )
       );
     }
@@ -83,7 +102,8 @@ function App() {
     if (activeTab.searchTerm && 
         activeTab.selectedRegion &&
         !activeTab.loading && 
-        activeTab.tenders.length === 0) {
+        activeTab.tenders.length === 0 &&
+        !activeTab.error) {
       fetchTenders(activeTab.searchTerm, activeTabId, activeTab.selectedRegion);
     }
   }, [activeTabId, activeTab, fetchTenders]);
@@ -93,7 +113,7 @@ function App() {
     
     setTabs(prevTabs => 
       prevTabs.map(tab => 
-        tab.id === tabId ? { ...tab, searchTerm: term, selectedRegion: region } : tab
+        tab.id === tabId ? { ...tab, searchTerm: term, selectedRegion: region, error: null } : tab
       )
     );
     
@@ -103,7 +123,7 @@ function App() {
   const handleClearSearch = useCallback((tabId) => {
     setTabs(prevTabs => 
       prevTabs.map(tab => 
-        tab.id === tabId ? { ...tab, searchTerm: '', tenders: [], selectedRegion: null } : tab
+        tab.id === tabId ? { ...tab, searchTerm: '', tenders: [], selectedRegion: null, error: null } : tab
       )
     );
   }, []);
@@ -115,7 +135,8 @@ function App() {
       searchTerm: '',
       tenders: [], 
       loading: false,
-      selectedRegion: null
+      selectedRegion: null,
+      error: null
     }]);
     setActiveTabId(newTabId);
   }, [tabs]);
@@ -131,7 +152,8 @@ function App() {
         searchTerm: '',
         tenders: [], 
         loading: false,
-        selectedRegion: null
+        selectedRegion: null,
+        error: null
       }]);
       setActiveTabId(newTabId);
     } else {
@@ -172,6 +194,17 @@ function App() {
       />
       {activeTab.loading ? (
         <div className="loading">Загрузка...</div>
+      ) : activeTab.error ? (
+        <div className="error-message">
+          <p>{activeTab.error}</p>
+          <button 
+            className="retry-button" 
+            onClick={() => activeTab.searchTerm && activeTab.selectedRegion && 
+              handleSearch(activeTab.searchTerm, activeTab.id, activeTab.selectedRegion)}
+          >
+            Повторить поиск
+          </button>
+        </div>
       ) : (
         <TenderList 
           tenders={activeTab.tenders} 
