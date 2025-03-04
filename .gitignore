@@ -6,6 +6,12 @@ nohup.out
 resources/
 *.db
 
+# SSL сертификаты
+ssl/
+*.pem
+*.key
+*.crt
+
 # Зависимости
 /node_modules
 /.pnp
