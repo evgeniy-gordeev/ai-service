@@ -1,21 +1,27 @@
 import React from 'react';
-import TenderCard from './TenderCard';
 import './TenderList.css';
+import TenderCard from './TenderCard';
 
 const TenderList = ({ tenders, onRemoveTender }) => {
+  // Проверяем на специальный случай "Тендеры не найдены"
+  if (tenders.length === 1 && tenders[0].no_results) {
+    return (
+      <div className="no-results">
+        <h3>Тендеры не найдены</h3>
+        <p>Попробуйте изменить условия поиска</p>
+      </div>
+    );
+  }
+
   return (
     <div className="tender-list">
-      {tenders.length > 0 ? (
-        tenders.map(tender => (
-          <TenderCard 
-            key={tender.id} 
-            tender={tender} 
-            onRemove={onRemoveTender}
-          />
-        ))
-      ) : (
-        <div className="no-results">Нет результатов для отображения</div>
-      )}
+      {tenders.map(tender => (
+        <TenderCard 
+          key={tender.id} 
+          tender={tender} 
+          onRemove={() => onRemoveTender(tender.id)}
+        />
+      ))}
     </div>
   );
 };

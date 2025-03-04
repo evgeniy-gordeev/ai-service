@@ -196,7 +196,22 @@ async def search_tenders(request: SearchRequest):
         
         if not tenders:
             logger.warning("Не найдено тендеров после фильтрации")
-            return []
+            # Возвращаем специальный объект вместо пустого массива
+            return [{
+                'id': 'no-results',
+                'name': 'Тендеры не найдены',
+                'price': 0,
+                'law_type': '',
+                'purchase_method': '',
+                'okpd2_code': '',
+                'publish_date': '',
+                'end_date': '',
+                'customer_inn': '',
+                'customer_name': '',
+                'region': '',
+                'similarity_score': 0,
+                'no_results': True  # Специальное поле для определения отсутствия результатов
+            }]
         
         logger.info(f"Найдено тендеров после фильтрации: {len(tenders)}")
         
