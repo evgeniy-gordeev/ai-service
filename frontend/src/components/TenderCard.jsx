@@ -11,6 +11,12 @@ const TenderCard = ({ tender, onRemove }) => {
     <div className="tender-card">
       <div className="tender-header">
         <div className="tender-id">{tender.id}</div>
+        {tender.score !== null && (
+          <div className="tender-score">
+            <i className="score-icon"></i>
+            Релевантность: {tender.score}
+          </div>
+        )}
         <button 
           className="remove-tender-button" 
           onClick={() => onRemove(tender.id)}

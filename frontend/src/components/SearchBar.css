@@ -163,6 +163,26 @@
   animation: fadeIn 0.3s ease-in-out;
 }
 
+.tender-count-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tender-count-input {
+  width: 80px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.tender-count-container label {
+  font-size: 14px;
+  color: #666;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

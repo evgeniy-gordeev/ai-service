@@ -16,9 +16,11 @@ from src.models import ModelFactory, ModelType, BaseEmbeddingModel
 import numpy as np
 from src.database import Database
 from src.search_utils import search, angular_distance_to_similarity, rrf_rank, search_faster, simple_rank
+import traceback
+import re 
 
 logger = setup_logger(__name__)
-model = ModelFactory.get_model(ModelType.roberta)
+model = 0 #ModelFactory.get_model(ModelType.roberta)
 
 # Ensure resources directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -120,6 +122,10 @@ def create_tender_embeddings(tenders_summary_path: str, model: BaseEmbeddingMode
         logger.error(f"Error creating embeddings: {str(e)}")
         return False
 
+def get_traceback(e: Exception) -> str:
+    """Получить полную трассировку ошибки в виде строки"""
+    return ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+
 @app.post("/download-tenders/")
 async def api_download_tenders(request: TenderDownloadRequest):
     try:
@@ -152,9 +158,19 @@ async def api_download_tenders(request: TenderDownloadRequest):
             "model_type": request.model_type
         }
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(ve)}")
+        error_traceback = get_traceback(ve)
+        logger.error(f"Ошибка валидации даты: {str(ve)}\nПолный traceback:\n{error_traceback}")
+        raise HTTPException(status_code=400, detail={
+            "error": f"Invalid date format: {str(ve)}",
+            "traceback": error_traceback
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error downloading tenders: {str(e)}")
+        error_traceback = get_traceback(e)
+        logger.error(f"Ошибка загрузки тендеров: {str(e)}\nПолный traceback:\n{error_traceback}")
+        raise HTTPException(status_code=500, detail={
+            "error": f"Error downloading tenders: {str(e)}",
+            "traceback": error_traceback
+        })
 
 @app.post("/search-tenders/")
 async def search_tenders(request: SearchRequest):
@@ -167,96 +183,17 @@ async def search_tenders(request: SearchRequest):
     Returns:
         list: Список найденных тендеров
     """
-    try:
-        # Анализируем запрос с помощью GigaChat, передаем регион если он указан
-        parsed_data = parse_query(request.query, region_code=request.region)
-        
-        # Логируем распарсенные данные
-        logger.info(f"Parsed query: {parsed_data}")
-        
-        # Убедимся, что в parsed_data есть все необходимые ключи
-        if not isinstance(parsed_data, dict):
-            parsed_data = {"query": request.query}
-        if "query" not in parsed_data or not parsed_data["query"]:
-            parsed_data["query"] = request.query
-        if "заказчик" not in parsed_data:
-            parsed_data["заказчик"] = None
-        
-        # Фильтруем тендеры по параметрам из запроса
-        tenders = db.get_tenders(
-            region=parsed_data.get("region"),
-            date=parsed_data.get("date"),
-            min_price=parsed_data.get("min_price"),
-            max_price=parsed_data.get("max_price"),
-            law_type=parsed_data.get("document"),
-            purchase_method=parsed_data.get("type"),
-            okpd2_code=parsed_data.get("окпд2"),
-            customer_inn=parsed_data.get("инн"),
-        )
-        
-        if not tenders:
-            logger.warning("Не найдено тендеров после фильтрации")
-            # Возвращаем специальный объект вместо пустого массива
-            return [{
-                'id': 'no-results',
-                'name': 'Тендеры не найдены',
-                'price': 0,
-                'law_type': '',
-                'purchase_method': '',
-                'okpd2_code': '',
-                'publish_date': '',
-                'end_date': '',
-                'customer_inn': '',
-                'customer_name': '',
-                'region': '',
-                'similarity_score': 0,
-                'no_results': True  # Специальное поле для определения отсутствия результатов
-            }]
-        
-        logger.info(f"Найдено тендеров после фильтрации: {len(tenders)}")
-        
-        # Выполняем поиск по названию
-        nearest_indices_by_name = search_faster(
-            parsed_data['query'], 
-            tenders, 
-            'vector', 
-            request.top_k, 
-            model
-        )
-        
-        # Если указан заказчик, ищем и по заказчику
-        if parsed_data['заказчик'] is not None:
-            logger.info(f"Поиск по заказчику: {parsed_data['заказчик']}")
-            nearest_indices_by_customer_name = search_faster(
-                parsed_data['заказчик'], 
-                tenders, 
-                'vector_customer_name', 
-                len(tenders) // 2, 
-                model
-            )
-            
-            # Выполняем ранжирование по RRF
-            nearest_indices = rrf_rank(
-                nearest_indices_by_name[0], 
-                nearest_indices_by_name[1], 
-                nearest_indices_by_customer_name[0], 
-                nearest_indices_by_customer_name[1], 
-                k=60
-            )
+    # TENDER ID
+    for ch in request.query.strip():
+        if not ch.isdigit():
+            tender_id = None
+            break
         else:
-            nearest_indices = nearest_indices_by_name
-        
-        # Подготавливаем результаты поиска
-        results = []
-        i = 0
-        for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
-            if idx >= len(tenders):
-                continue
-                
-            tender = tenders[idx]
-            
-            try:
-                results.append({
+            tender_id = request.query
+            tenders = db.get_tenders(tender_id=tender_id.strip())
+            if len(tenders) > 0:
+                tender = tenders[0]
+                return [{
                     'id': tender['id'],
                     'name': tender['name'],
                     'price': float(tender['price']) if tender['price'] else 0,
@@ -268,21 +205,140 @@ async def search_tenders(request: SearchRequest):
                     'customer_inn': tender.get('customer_inn'),
                     'customer_name': tender.get('customer_name'),
                     'region': tender.get('region'),
-                    'similarity_score': float(similarity_score)
-                })
-                i += 1
-                if i == request.top_k:
-                    break
-            except Exception as e:
-                logger.error(f"Ошибка создания результата для тендера {tender.get('id', 'unknown')}: {str(e)}")
-                continue
+                    'similarity_score': 1
+                }]
+            else:
+                return [{
+                    'id': 'no-results',
+                    'name': 'Тендеры не найдены',
+                    'price': 0,
+                    'law_type': '',
+                    'purchase_method': '',
+                    'okpd2_code': '',
+                    'publish_date': '',
+                    'end_date': '',
+                    'customer_inn': '',
+                    'customer_name': '',
+                    'region': '',
+                    'similarity_score': 0,
+                    'no_results': True  # Специальное поле для определения отсутствия результатов
+                }]
+    
+
+               
+    # Анализируем запрос с помощью GigaChat, передаем регион если он указан
+    parsed_data = parse_query(request.query, region_code=request.region)
+    
+    # Логируем распарсенные данные
+    logger.info(f"Parsed query: {parsed_data}")
+    
+    # Убедимся, что в parsed_data есть все необходимые ключи
+    if not isinstance(parsed_data, dict):
+        parsed_data = {"query": request.query}
+    if "query" not in parsed_data or not parsed_data["query"]:
+        parsed_data["query"] = request.query
+    if "заказчик" not in parsed_data:
+        parsed_data["заказчик"] = None
+
+# Фильтруем тендеры по параметрам из запроса
+    tenders = db.get_tenders(
+        region=parsed_data.get("region"),
+        date=parsed_data.get("date"),
+        min_price=parsed_data.get("min_price"),
+        max_price=parsed_data.get("max_price"),
+        law_type=parsed_data.get("document"),
+        purchase_method=parsed_data.get("type"),
+        okpd2_code=parsed_data.get("окпд2"),
+        customer_inn=parsed_data.get("инн"),
+        keywords=parsed_data.get("keywords")
+    )
+
+    if not tenders:
+        logger.warning("Не найдено тендеров после фильтрации")
+        # Возвращаем специальный объект вместо пустого массива
+        return [{
+            'id': 'no-results',
+            'name': 'Тендеры не найдены',
+            'price': 0,
+            'law_type': '',
+            'purchase_method': '',
+            'okpd2_code': '',
+            'publish_date': '',
+            'end_date': '',
+            'customer_inn': '',
+            'customer_name': '',
+            'region': '',
+            'similarity_score': 0,
+            'no_results': True  # Специальное поле для определения отсутствия результатов
+        }]
         
-        logger.info(f"Возвращаем {len(results)} похожих тендеров")
+    logger.info(f"Найдено тендеров после фильтрации: {len(tenders)}")
         
-        return results
-    except Exception as e:
-        logger.error(f"Ошибка при обработке запроса: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки запроса: {str(e)}")
+    # Выполняем поиск по названию
+    nearest_indices_by_name = search_faster(
+        parsed_data['query'], 
+        tenders, 
+        'vectors_gigachat', 
+        request.top_k, 
+        model
+    )
+    
+    # Если указан заказчик, ищем и по заказчику
+    if parsed_data['заказчик'] is not None:
+        logger.info(f"Поиск по заказчику: {parsed_data['заказчик']}")
+        nearest_indices_by_customer_name = search_faster(
+            parsed_data['заказчик'], 
+            tenders, 
+            'vector_customer_name', 
+            len(tenders) // 2, 
+            model
+        )
+        
+        # Выполняем ранжирование по RRF
+        nearest_indices = rrf_rank(
+            nearest_indices_by_name[0], 
+            nearest_indices_by_name[1], 
+            nearest_indices_by_customer_name[0], 
+            nearest_indices_by_customer_name[1], 
+            k=60
+        )
+    else:
+        nearest_indices = nearest_indices_by_name
+
+    # Подготавливаем результаты поиска
+    results = []
+    i = 0
+    for idx, similarity_score in zip(nearest_indices[0], nearest_indices[1]):
+        if idx >= len(tenders):
+            continue
+            
+        tender = tenders[idx]
+        
+        try:
+            results.append({
+                'id': tender['id'],
+                'name': tender['name'],
+                'price': float(tender['price']) if tender['price'] else 0,
+                'law_type': tender.get('law_type'),
+                'purchase_method': tender.get('purchase_method'),
+                'okpd2_code': tender.get('okpd2_code'),
+                'publish_date': tender.get('publish_date'),
+                'end_date': tender.get('end_date'),
+                'customer_inn': tender.get('customer_inn'),
+                'customer_name': tender.get('customer_name'),
+                'region': tender.get('region'),
+                'similarity_score': float(similarity_score)
+            })
+            i += 1
+            if i == request.top_k:
+                break
+        except Exception as e:
+            logger.error(f"Ошибка создания результата для тендера {tender.get('id', 'unknown')}: {str(e)}")
+            continue
+    
+    logger.info(f"Возвращаем {len(results)} похожих тендеров")
+    
+    return results
 
 if __name__ == "__main__":
     uvicorn.run(

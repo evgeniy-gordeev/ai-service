@@ -1,3 +1,2 @@
-SELECT * FROM tenders 
-WHERE region = '2'
-LIMIT 10;
+SELECT * from tenders where region = '05' AND INSTR(UPPER(name), 'ГОВЯДИНА') > 0
+

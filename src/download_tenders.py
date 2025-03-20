@@ -18,7 +18,6 @@ from src.models import ModelFactory, ModelType
 from src.database import Database
 
 
-
 logger = setup_logger(__name__)
 
 URL = "https://int44.zakupki.gov.ru/eis-integration/services/getDocsIP"

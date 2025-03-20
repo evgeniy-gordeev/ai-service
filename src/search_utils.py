@@ -3,9 +3,12 @@ from annoy import AnnoyIndex
 from fastapi import logger
 import numpy as np
 from src.logger_config import setup_logger
+from gigachat import GigaChat
 
 logger = setup_logger(__name__)
 
+# GigaChat credentials
+GIGACHAT_CREDENTIALS = "YWQxMDllYmQtZDA0ZC00MDM2LWEyMjktMWU1ZTJlOTViNzkyOmY2NWU0YjE2LWE0ZDctNGNlOC05M2RiLWZkZjgwZDc5YTUyYw=="
 
 def rrf_rank(indexes1, scores1, indexes2, scores2, k=60):
     rank_dict = {}
@@ -48,7 +51,13 @@ def simple_rank(name_indices, customer_name_indices):
 
 
 def search_faster(query, tenders, key, top_k, model):
-    query_vector = model.get_embeddings([query])[0]
+    # Получаем вектор запроса с помощью GigaChat
+    with GigaChat(credentials=GIGACHAT_CREDENTIALS, verify_ssl_certs=False) as giga:
+        embedding_response = giga.embeddings([query]).data[0]
+        query_vector = np.array(embedding_response.embedding)
+    print(query_vector.shape)
+    print(tenders[0][key].shape)
+    
     similarities = []
     valid_indices = []
 

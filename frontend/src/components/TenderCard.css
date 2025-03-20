@@ -11,6 +11,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .tender-id {
@@ -20,6 +22,24 @@
   padding: 5px 10px;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.tender-score {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f0f7eb;
+  color: #4caf50;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.score-icon::before {
+  content: "⭐";
+  margin-right: 5px;
 }
 
 .remove-tender-button {

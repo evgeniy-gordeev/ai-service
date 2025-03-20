@@ -29,6 +29,7 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
+            
             # Создаем таблицу для тендеров
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS tenders (
@@ -117,7 +118,9 @@ class Database:
         purchase_method: str = None,
         okpd2_code: str = None,
         customer_inn: str = None,
-        customer_name: str = None
+        customer_name: str = None,
+        tender_id: str = None,
+        keywords: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Получение тендеров с опциональной фильтрацией по региону, дате публикации и другим параметрам
@@ -141,8 +144,8 @@ class Database:
                     id, name, price, law_type, purchase_method, 
                     okpd2_code, publish_date, end_date, 
                     customer_inn, customer_name, 
-                    region, date_added, vector, vector_customer_name
-                FROM tenders 
+                    region, date_added, vector, vector_customer_name, vectors_gigachat
+                FROM tenders
                 WHERE 1=1
             """
             
@@ -199,9 +202,23 @@ class Database:
                 query += " AND customer_inn = ?"
                 params.append(customer_inn)
             
+            if tender_id is not None:
+                query += " AND id = ?"
+                params.append(tender_id)
+            
+            if keywords is not None and len(keywords) > 0:
+                # Search for each keyword in the tender name
+                keyword_conditions = []
+                for keyword in keywords:
+                    keyword_conditions.append("LOWER(name) LIKE ?")
+                    params.append(f"%{keyword.lower()}%")
+                
+                # Join conditions with OR to match any of the keywords
+                query += f" AND ({' OR '.join(keyword_conditions)})"
+            
+            
             # Execute the query
             cursor.execute(query, params)
-            
             return [
                 {
                     'id': row[0],
@@ -217,7 +234,8 @@ class Database:
                     'region': row[10],
                     'date_added': row[11],
                     'vector': np.frombuffer(row[12], dtype=np.float32) if row[12] is not None else None,
-                    'vector_customer_name': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None
+                    'vector_customer_name': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None,
+                    'vectors_gigachat': np.frombuffer(row[14], dtype=np.float64) if row[14] is not None else None
                 }
                 for row in cursor.fetchall()
             ]

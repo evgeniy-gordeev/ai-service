@@ -19,17 +19,17 @@ const sanitizeQueryString = (str) => {
   return str.replace(/['"\\]/g, '');
 };
 
-export const searchTenders = async (query, regionCode = null) => {
+export const searchTenders = async (query, regionCode = null, tenderCount = 10) => {
   try {
     // Очищаем запрос от кавычек и других проблемных символов
     const sanitizedQuery = sanitizeQueryString(query);
     
-    console.log(`Отправка POST-запроса с запросом: ${sanitizedQuery}, регион: ${regionCode}`);
+    console.log(`Отправка POST-запроса с запросом: ${sanitizedQuery}, регион: ${regionCode}, количество: ${tenderCount}`);
     
     // Формируем тело запроса
     const requestBody = {
       query: sanitizedQuery,
-      top_k: 10
+      top_k: tenderCount
     };
     
     // Добавляем код региона, если он задан
@@ -68,6 +68,7 @@ export const searchTenders = async (query, regionCode = null) => {
         new Date().toLocaleDateString('ru-RU'),
       customer: tender.customer_name || tender.customer || "Неизвестный заказчик",
       region: tender.region || regionCode || null,
+      score: tender.similarity_score !== undefined ? parseFloat(tender.similarity_score).toFixed(2) : null
     }));
     
   } catch (error) {

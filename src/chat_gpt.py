@@ -1,3 +1,4 @@
+import re
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
 import json
@@ -102,6 +103,9 @@ def parse_query(SEARCH_QUERY, region_code=None, region_name=None):
     # Преобразуем заказчика в верхний регистр, если он есть
     if 'заказчик' in data and data["заказчик"] is not None:
         data["заказчик"] = data["заказчик"].upper()
+    
+    keywords = re.findall(r'#(.*?)#', SEARCH_QUERY) 
+    data["keywords"] = keywords
     
     return data
 

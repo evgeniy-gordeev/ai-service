@@ -14,40 +14,49 @@ const SearchBar = ({
   const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0];
   const [inputValue, setInputValue] = useState('');
   const [selectedRegion, setSelectedRegion] = useState(null);
-  const [showRegionError, setShowRegionError] = useState(false);
+  const [tenderCount, setTenderCount] = useState(10);
   
   // Синхронизируем inputValue с изменением активной вкладки
   useEffect(() => {
     if (activeTab) {
       setInputValue(activeTab.searchTerm || '');
       setSelectedRegion(activeTab.selectedRegion || null);
+      setTenderCount(activeTab.tenderCount || 10);
     }
   }, [activeTab]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Проверка выбран ли регион
-    if (!selectedRegion) {
-      setShowRegionError(true);
-      setTimeout(() => setShowRegionError(false), 3000); // Скрыть ошибку через 3 секунды
-      return;
-    }
-    
     if (inputValue.trim()) {
-      onSearch(inputValue, activeTabId, selectedRegion);
+      onSearch(inputValue, activeTabId, selectedRegion, tenderCount);
     }
   };
   
   const handleClear = () => {
     setInputValue('');
     setSelectedRegion(null);
+    setTenderCount(10);
     onClearSearch();
   };
 
   const handleRegionChange = (region) => {
     setSelectedRegion(region);
-    setShowRegionError(false); // Скрыть ошибку при выборе региона
+  };
+
+  const handleTenderCountChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    if (!isNaN(value) && value > 0) {
+      setTenderCount(value);
+    } else if (e.target.value === '') {
+      setTenderCount('');
+    }
+  };
+
+  const handleTenderCountBlur = () => {
+    if (tenderCount === '' || isNaN(tenderCount) || tenderCount < 1) {
+      setTenderCount(10);
+    }
   };
 
   return (
@@ -103,13 +112,20 @@ const SearchBar = ({
               </button>
             )}
           </div>
-        </div>
-        
-        {showRegionError && (
-          <div className="region-error">
-            Пожалуйста, выберите регион для поиска
+          
+          <div className="tender-count-container">
+            <label htmlFor="tenderCount">Количество тендеров:</label>
+            <input
+              id="tenderCount"
+              type="number"
+              min="1"
+              className="tender-count-input"
+              value={tenderCount}
+              onChange={handleTenderCountChange}
+              onBlur={handleTenderCountBlur}
+            />
           </div>
-        )}
+        </div>
         
         <button type="submit" className="search-button">Поиск</button>
       </form>

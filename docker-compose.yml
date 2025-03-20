@@ -19,11 +19,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 180s
-    deploy:
-      resources:
-        limits:
-          cpus: '8'
-          memory: 30G
     networks:
       - tenders-network
     restart: unless-stopped
@@ -48,11 +43,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
     networks:
       - tenders-network
     restart: unless-stopped

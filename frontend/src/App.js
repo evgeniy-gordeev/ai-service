@@ -6,8 +6,8 @@ import { searchTenders } from './services/api';
 
 // Константа для ключа localStorage
 const STORAGE_KEY = 'tenders_search_tabs';
-// Константа для таймаута поиска (10 секунд)
-const SEARCH_TIMEOUT = 10000;
+// Константа для таймаута поиска (5 минут)
+const SEARCH_TIMEOUT = 300000;
 
 function App() {
   // Загружаем вкладки из localStorage или используем значение по умолчанию
@@ -15,11 +15,11 @@ function App() {
     try {
       const savedTabs = localStorage.getItem(STORAGE_KEY);
       return savedTabs ? JSON.parse(savedTabs) : [
-        { id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null }
+        { id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null, tenderCount: 10 }
       ];
     } catch (error) {
       console.error('Ошибка при загрузке данных из localStorage:', error);
-      return [{ id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null }];
+      return [{ id: 1, searchTerm: '', tenders: [], loading: false, selectedRegion: null, error: null, tenderCount: 10 }];
     }
   });
   
@@ -53,7 +53,7 @@ function App() {
     }
   }, [activeTabId]);
 
-  const fetchTenders = useCallback(async (query, tabId, region) => {
+  const fetchTenders = useCallback(async (query, tabId, region, tenderCount = 10) => {
     // Сбрасываем состояние ошибки при начале нового поиска
     setTabs(prevTabs => 
       prevTabs.map(tab => 
@@ -71,14 +71,14 @@ function App() {
     try {
       // Используем Promise.race для конкуренции между фактическим запросом и таймаутом
       const data = await Promise.race([
-        searchTenders(query, region.code),
+        searchTenders(query, region.code, tenderCount),
         timeoutPromise
       ]);
       
       setTabs(prevTabs => 
         prevTabs.map(tab => 
           tab.id === tabId ? 
-            { ...tab, tenders: data, loading: false, searchTerm: query, selectedRegion: region, error: null } : 
+            { ...tab, tenders: data, loading: false, searchTerm: query, selectedRegion: region, error: null, tenderCount } : 
             tab
         )
       );
@@ -104,26 +104,26 @@ function App() {
         !activeTab.loading && 
         activeTab.tenders.length === 0 &&
         !activeTab.error) {
-      fetchTenders(activeTab.searchTerm, activeTabId, activeTab.selectedRegion);
+      fetchTenders(activeTab.searchTerm, activeTabId, activeTab.selectedRegion, activeTab.tenderCount || 10);
     }
   }, [activeTabId, activeTab, fetchTenders]);
 
-  const handleSearch = useCallback((term, tabId = activeTabId, region) => {
+  const handleSearch = useCallback((term, tabId = activeTabId, region, tenderCount = 10) => {
     if (!term.trim() || !region) return;
     
     setTabs(prevTabs => 
       prevTabs.map(tab => 
-        tab.id === tabId ? { ...tab, searchTerm: term, selectedRegion: region, error: null } : tab
+        tab.id === tabId ? { ...tab, searchTerm: term, selectedRegion: region, error: null, tenderCount } : tab
       )
     );
     
-    fetchTenders(term, tabId, region);
+    fetchTenders(term, tabId, region, tenderCount);
   }, [activeTabId, fetchTenders]);
 
   const handleClearSearch = useCallback((tabId) => {
     setTabs(prevTabs => 
       prevTabs.map(tab => 
-        tab.id === tabId ? { ...tab, searchTerm: '', tenders: [], selectedRegion: null, error: null } : tab
+        tab.id === tabId ? { ...tab, searchTerm: '', tenders: [], selectedRegion: null, error: null, tenderCount: 10 } : tab
       )
     );
   }, []);
@@ -136,7 +136,8 @@ function App() {
       tenders: [], 
       loading: false,
       selectedRegion: null,
-      error: null
+      error: null,
+      tenderCount: 10
     }]);
     setActiveTabId(newTabId);
   }, [tabs]);
@@ -153,7 +154,8 @@ function App() {
         tenders: [], 
         loading: false,
         selectedRegion: null,
-        error: null
+        error: null,
+        tenderCount: 10
       }]);
       setActiveTabId(newTabId);
     } else {
@@ -200,7 +202,7 @@ function App() {
           <button 
             className="retry-button" 
             onClick={() => activeTab.searchTerm && activeTab.selectedRegion && 
-              handleSearch(activeTab.searchTerm, activeTab.id, activeTab.selectedRegion)}
+              handleSearch(activeTab.searchTerm, activeTab.id, activeTab.selectedRegion, activeTab.tenderCount || 10)}
           >
             Повторить поиск
           </button>
