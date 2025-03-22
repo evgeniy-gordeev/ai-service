@@ -2,7 +2,7 @@ import heapq
 from annoy import AnnoyIndex
 from fastapi import logger
 import numpy as np
-from src.logger_config import setup_logger
+from logger_config import setup_logger
 from gigachat import GigaChat
 
 logger = setup_logger(__name__)

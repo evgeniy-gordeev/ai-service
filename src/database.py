@@ -4,8 +4,8 @@ import os
 from typing import List, Dict, Any
 
 import tqdm
-from src.models.model_factory import ModelFactory
-from src.logger_config import setup_logger
+from models.model_factory import ModelFactory
+from logger_config import setup_logger
 import numpy as np
 
 logger = setup_logger(__name__)

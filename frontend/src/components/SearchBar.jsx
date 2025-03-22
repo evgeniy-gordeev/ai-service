@@ -35,8 +35,6 @@ const SearchBar = ({
   
   const handleClear = () => {
     setInputValue('');
-    setSelectedRegion(null);
-    setTenderCount(10);
     onClearSearch();
   };
 

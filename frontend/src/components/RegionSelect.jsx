@@ -24,16 +24,16 @@ const RegionSelect = ({ selectedRegion, onRegionChange }) => {
 
   // Фильтрация регионов при вводе поиска
   useEffect(() => {
-    if (!searchTerm.trim()) {
+    const lowercasedSearchTerm = searchTerm.toLowerCase().trim();
+    if (!lowercasedSearchTerm) {
       setFilteredRegions(REGIONS);
       return;
     }
 
-    const lowercasedSearchTerm = searchTerm.toLowerCase();
     const filtered = REGIONS.filter(
       region => 
         region.name.toLowerCase().includes(lowercasedSearchTerm) || 
-        region.code.includes(lowercasedSearchTerm)
+        (region.code && region.code.includes(lowercasedSearchTerm))
     );
     
     setFilteredRegions(filtered);
@@ -46,7 +46,7 @@ const RegionSelect = ({ selectedRegion, onRegionChange }) => {
   };
 
   const selectedRegionDisplay = selectedRegion 
-    ? `${selectedRegion.code} - ${selectedRegion.name}` 
+    ? `${selectedRegion.code ? selectedRegion.code + ' - ' : ''}${selectedRegion.name}` 
     : 'Выберите регион';
 
   return (
@@ -74,12 +74,18 @@ const RegionSelect = ({ selectedRegion, onRegionChange }) => {
             {filteredRegions.length > 0 ? (
               filteredRegions.map(region => (
                 <div 
-                  key={region.code} 
+                  key={region.code || 'all'} 
                   className={`region-item ${selectedRegion?.code === region.code ? 'selected' : ''}`}
                   onClick={() => handleRegionSelect(region)}
                 >
-                  <span className="region-code">{region.code}</span>
-                  <span className="region-name">{region.name}</span>
+                  {region.code ? (
+                    <>
+                      <span className="region-code">{region.code}</span>
+                      <span className="region-name">{region.name}</span>
+                    </>
+                  ) : (
+                    <span className="region-name">{region.name}</span>
+                  )}
                 </div>
               ))
             ) : (

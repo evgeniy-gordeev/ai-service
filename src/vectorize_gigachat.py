@@ -38,11 +38,11 @@ def get_tender_batches():
     cursor = conn.cursor()
     
     # Get total count for progress bar
-    cursor.execute("SELECT COUNT(*) FROM tenders LIMIT 10")
+    cursor.execute("SELECT COUNT(*) FROM tenders WHERE vectors_gigachat IS NULL")
     total_count = cursor.fetchone()[0]
     
     # Get tenders without vectors
-    cursor.execute("SELECT id, name FROM tenders LIMIT 10")
+    cursor.execute("SELECT id, name FROM tenders WHERE vectors_gigachat IS NULL")
     
     batches = []
     current_batch = []
