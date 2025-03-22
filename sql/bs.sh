@@ -1,0 +1,1 @@
+0 9 * * * venv/bin/python3 -m src.download_tenders --start-date $(date +\%Y-\%m-\%d) --end-date $(date +\%Y-\%m-\%d) --vectorize >> ./logs/cron.log

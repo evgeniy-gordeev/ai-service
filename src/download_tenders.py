@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+import os
 from pathlib import Path
 import sys
 import uuid
@@ -16,6 +17,7 @@ from annoy import AnnoyIndex
 from src.logger_config import setup_logger
 from src.models import ModelFactory, ModelType
 from src.database import Database
+from src.vectorize_gigachat import vectorize_tenders
 
 
 logger = setup_logger(__name__)
@@ -246,7 +248,7 @@ def get_tenders_info(files_content):
 
 
 def download_tenders(regions, start_date, end_date, save_xml):
-    db = Database(db_path='resources/tenders_1to9.db')
+    db = Database(db_path='resources/tenders.db')
     
     current_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -356,15 +358,13 @@ def main():
 
     args = parser.parse_args()
 
-    all_regions = range(1, 100)
+    all_regions = range(10, 100)
     all_regions = [str(el) for el in all_regions]
-    all_regions = ['01', '02', '03', '04', '05', '06', '07', '08', '09']
+    all_regions.extend(['01', '02', '03', '04', '05', '06', '07', '08', '09'])
     download_tenders(all_regions, args.start_date, args.end_date, args.save_xml)
 
     if args.vectorize:
-        create_tender_embeddings(
-            model_type=ModelType(args.model_type)
-        )
+        vectorize_tenders()
 
 if __name__ == '__main__':
     main()

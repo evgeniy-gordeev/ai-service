@@ -1,1 +1,1 @@
-select id, purchase_method from tenders WHERE date_added = '2025-03-21'
+select * from tenders WHERE date_added = '2025-03-19' limit 2
