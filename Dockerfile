@@ -28,13 +28,11 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-
 # Копируем только необходимые файлы приложения
 COPY src/ /app/src/
-COPY tenders_api.py /app/
 
 # Открываем порт
 EXPOSE 8001
 
 # Запуск приложения через uvicorn с настройками производительности
-CMD ["uvicorn", "tenders_api:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
+CMD ["uvicorn", "src.tenders_api:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]

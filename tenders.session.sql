@@ -1,1 +1,0 @@
-select purchase_method from tenders

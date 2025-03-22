@@ -47,7 +47,6 @@ services:
       - tenders-network
     restart: unless-stopped
 
-
 networks:
   tenders-network:
     driver: bridge

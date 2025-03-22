@@ -20,7 +20,7 @@ import traceback
 import re 
 
 logger = setup_logger(__name__)
-model = 0 #ModelFactory.get_model(ModelType.roberta)
+model = 0  # ModelFactory.get_model(ModelType.roberta)
 
 # Ensure resources directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -240,7 +240,7 @@ async def search_tenders(request: SearchRequest):
     if "заказчик" not in parsed_data:
         parsed_data["заказчик"] = None
 
-# Фильтруем тендеры по параметрам из запроса
+    # Фильтруем тендеры по параметрам из запроса
     tenders = db.get_tenders(
         region=parsed_data.get("region"),
         date=parsed_data.get("date"),
@@ -342,7 +342,7 @@ async def search_tenders(request: SearchRequest):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "tenders_api:app",
+        "src.tenders_api:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
