@@ -43,6 +43,7 @@ def run_daily_check():
         regions_str = ' '.join(regions)
         
         # Command to run the download_tenders.py script
+        project_root = Path(__file__).parent.parent.absolute() 
         cmd = f"cd {project_root} && python ./src/download_tenders.py --regions {regions_str} --start-date {today} --end-date {today} --save_xml"
         
         logger.info(f"Starting tender check for date: {today}")

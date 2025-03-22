@@ -1,1 +1,1 @@
-SELECT * from tenders where region = '05'
+select purchase_method from tenders

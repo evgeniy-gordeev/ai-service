@@ -125,6 +125,30 @@ def parse_region(REGION):
     payload.messages.append(Messages(role=MessagesRole.USER, content=REGION))
     response = giga.chat(payload)
 
+    # client = OpenAI(api_key = "sk-932d7d920e77485fb7f455cbc5e8e87b", base_url = 'https://api.deepseek.com')
+    # response = client.chat.completions.create(
+    #     model="deepseek-chat",
+    #     messages=[
+    #         {
+    #         "role": "system",
+    #         "content": [
+    #             {
+    #             "type": "text",
+    #             "text": PROMPT_FOR_REGION
+    #             }
+    #         ]
+    #         },
+    #         {
+    #         "role": "user",
+    #         "content": [
+    #             {
+    #             "type": "text",
+    #             "text": REGION
+    #             }
+    #         ]
+    #         }    
+    #     ],
+    # )    
     return response.choices[0].message.content
 
 if __name__ == "__main__":
