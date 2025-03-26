@@ -18,6 +18,7 @@ from src.database import Database
 from src.search_utils import search, angular_distance_to_similarity, rrf_rank, search_faster, simple_rank
 import traceback
 import re 
+import sqlite3
 
 logger = setup_logger(__name__)
 model = 0  # ModelFactory.get_model(ModelType.roberta)
@@ -82,6 +83,42 @@ class SearchRequest(BaseModel):
     query: str
     region: str = None
     top_k: int = 10
+
+class Database:
+    def __init__(self):
+        self.db_path = "resources/tenders_stage.db"
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
+        self.cursor = self.conn.cursor()
+
+    def get_tenders(self, region: str, start_date: str, end_date: str, limit: int = 1000):
+        query = """
+        SELECT 
+            id,
+            name,
+            price,
+            law_type,
+            purchase_method,
+            okpd2_code,
+            publish_date,
+            end_date,
+            results_date,
+            customer_inn,
+            customer_name,
+            region,
+            date_added,
+            stage
+        FROM tenders 
+        WHERE region = ? 
+        AND date_added BETWEEN ? AND ?
+        ORDER BY date_added DESC
+        LIMIT ?
+        """
+        
+        self.cursor.execute(query, (region, start_date, end_date, limit))
+        rows = self.cursor.fetchall()
+        
+        return [dict(row) for row in rows]
 
 def create_tender_embeddings(tenders_summary_path: str, model: BaseEmbeddingModel):
     """Create embeddings for tenders using the specified model."""

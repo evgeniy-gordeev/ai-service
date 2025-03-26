@@ -1,8 +1,9 @@
 .tender-card {
-  background-color: white;
+  background: white;
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   position: relative;
 }
 
@@ -10,110 +11,99 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
   flex-wrap: wrap;
   gap: 10px;
 }
 
 .tender-id {
-  display: inline-block;
-  background-color: #e3f2fd;
+  font-weight: 500;
   color: #2196F3;
-  padding: 5px 10px;
-  border-radius: 4px;
   font-size: 14px;
 }
 
 .tender-score {
-  display: inline-flex;
-  align-items: center;
-  background-color: #f0f7eb;
-  color: #4caf50;
-  padding: 5px 10px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
   border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  flex-grow: 1;
-  justify-content: center;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .score-icon::before {
-  content: "⭐";
-  margin-right: 5px;
+  content: "★";
+  color: #ffd700;
 }
 
 .remove-tender-button {
   background: none;
   border: none;
+  color: #999;
   font-size: 20px;
-  color: #bbb;
   cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+  padding: 0 5px;
+  line-height: 1;
 }
 
 .remove-tender-button:hover {
-  background-color: #f5f5f5;
   color: #f44336;
 }
 
 .tender-title {
-  font-size: 18px;
-  color: #333;
-  font-weight: 500;
+  font-size: 16px;
   margin: 0 0 15px 0;
+  color: #333;
+  line-height: 1.4;
 }
 
-.tender-details {
+.tender-info {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  color: #666;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tender-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   font-size: 14px;
-  flex-wrap: wrap;
+  line-height: 1.4;
 }
 
-.tender-date {
-  display: flex;
-  align-items: center;
+.detail-label {
+  color: #666;
   min-width: 120px;
-}
-
-.tender-price {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  min-width: 150px;
-  font-weight: 600;
-  color: #388e3c;
-  flex-grow: 1;
+  gap: 5px;
 }
 
-.tender-customer {
-  display: flex;
-  align-items: center;
-  flex-basis: 100%;
-  margin-top: 10px;
-  font-style: italic;
+.detail-value {
+  color: #333;
+  flex: 1;
 }
 
 /* Иконки */
 .calendar-icon::before {
   content: "📅";
-  margin-right: 5px;
 }
 
 .price-icon::before {
   content: "💰";
-  margin-right: 5px;
 }
 
 .building-icon::before {
   content: "🏢";
-  margin-right: 5px;
+}
+
+.location-icon::before {
+  content: "📍";
+}
+
+.purchase-icon::before {
+  content: "📋";
 } 

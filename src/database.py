@@ -41,7 +41,8 @@ class Database:
                     okpd2_code TEXT,          
                     
                     publish_date TEXT,        
-                    end_date TEXT,            
+                    end_date TEXT,      
+                    results_date TEXT,      
                     
                     customer_inn TEXT,        
                     customer_name TEXT,       
@@ -49,7 +50,9 @@ class Database:
                     region TEXT NOT NULL,
                     date_added TEXT NOT NULL,
                     vector BLOB,
-                    vector_customer_name BLOB
+                    vector_customer_name BLOB,
+                    vectors_gigachat BLOB,
+                    stage TEXT
                 )
             """)
             
@@ -81,11 +84,11 @@ class Database:
                     cursor.execute("""
                         INSERT OR REPLACE INTO tenders (
                             id, name, price, law_type, purchase_method,
-                            okpd2_code, publish_date, end_date,
+                            okpd2_code, publish_date, end_date, results_date, 
                             customer_inn, customer_name,
-                            region, date_added
+                            region, date_added, stage
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         tender['id'],
                         tender['name'],
@@ -95,10 +98,12 @@ class Database:
                         tender.get('okpd2_code'),
                         tender.get('publish_date'),
                         tender.get('end_date'),
+                        tender.get('results_date'),
                         tender.get('customer_inn'),
                         tender.get('customer_name'),
                         region,
-                        date
+                        date,
+                        tender['stage']
                     ))
                     count += 1
                 except sqlite3.Error as e:
@@ -142,7 +147,7 @@ class Database:
             query = """
                 SELECT 
                     id, name, price, law_type, purchase_method, 
-                    okpd2_code, publish_date, end_date, 
+                    okpd2_code, publish_date, end_date, results_date,
                     customer_inn, customer_name, 
                     region, date_added, vector, vector_customer_name, vectors_gigachat
                 FROM tenders
@@ -229,13 +234,14 @@ class Database:
                     'okpd2_code': row[5],
                     'publish_date': row[6],
                     'end_date': row[7],
-                    'customer_inn': row[8],
-                    'customer_name': row[9],
-                    'region': row[10],
-                    'date_added': row[11],
-                    'vector': np.frombuffer(row[12], dtype=np.float32) if row[12] is not None else None,
-                    'vector_customer_name': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None,
-                    'vectors_gigachat': np.frombuffer(row[14], dtype=np.float64) if row[14] is not None else None
+                    'results_date': row[8],
+                    'customer_inn': row[9],
+                    'customer_name': row[10],
+                    'region': row[11],
+                    'date_added': row[12],
+                    'vector': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None,
+                    'vector_customer_name': np.frombuffer(row[14], dtype=np.float32) if row[14] is not None else None,
+                    'vectors_gigachat': np.frombuffer(row[15], dtype=np.float64) if row[15] is not None else None
                 }
                 for row in cursor.fetchall()
             ]

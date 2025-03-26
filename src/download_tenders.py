@@ -160,17 +160,24 @@ def get_tenders_info(files_content):
                 except ValueError:
                     logger.warning(f"Could not parse price for tender {purchase_number}")
 
-            # Даты
+            #дата начала приема заявок
             publish_date = None
             publish_element = root.find('.//ns5:notificationInfo/ns5:procedureInfo/ns5:collectingInfo/ns5:startDT', namespaces)
             if publish_element is not None:
                 publish_date = publish_element.text.strip() if publish_element.text else None
             
-            update_date = None
-            update_element = root.find('.//ns6:modificationDate', namespaces)
-            if update_element is not None:
-                update_date = update_element.text.strip() if update_element.text else None
+            # update_date = None
+            # update_element = root.find('.//ns6:modificationDate', namespaces)
+            # if update_element is not None:
+            #     update_date = update_element.text.strip() if update_element.text else None
+
+            # дата подведения итогов
+            results_date = None
+            results_element = root.find('.//ns5:notificationInfo/ns5:procedureInfo/ns5:summarizingDate', namespaces)
+            if results_element is not None:
+                results_date = results_element.text.strip() if results_element.text else None
             
+            #дата окончания приема заявок
             end_date = None
             end_element = root.find('.//ns5:notificationInfo/ns5:procedureInfo/ns5:collectingInfo/ns5:endDT', namespaces)
             if end_element is not None:
@@ -224,17 +231,36 @@ def get_tenders_info(files_content):
                 #for elem in root.iter():
                     #print(f"{elem.tag}: {elem.text}")
 
+            # Get current date
+            # Determine stage based on current date relative to tender dates
+            
+            
+            current_date_obj = datetime.now(timezone(timedelta(hours=3)))
+            publish_date_obj = datetime.strptime(publish_date, '%Y-%m-%dT%H:%M:%S%z')
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S%z')
+            results_date_obj = datetime.strptime(results_date,"%Y-%m-%d%z")
+            
+            stage = 'неизвестно'
+            if publish_date_obj <= current_date_obj <= end_date_obj:
+                stage = 'подача заявок'
+            elif end_date_obj < current_date_obj <= results_date_obj:
+                stage = 'работа комиссии'
+            elif current_date_obj > results_date_obj:
+                stage = 'завершен'
+            
             tenders_info[purchase_number] = {
                 'name': purchase_name,
                 'price': price,
                 'publish_date': publish_date,
-                'update_date': update_date,
+                'results_date' : results_date,                
                 'end_date': end_date,
+                'stage': stage,
                 'law_type': law_type,
                 'purchase_method': purchase_method,
                 'okpd2_code': okpd2_code,
                 'customer_inn': customer_inn,
-                'customer_name': customer_name
+                'customer_name': customer_name,
+
             }
             
         except ET.ParseError as e:
@@ -248,7 +274,7 @@ def get_tenders_info(files_content):
 
 
 def download_tenders(regions, start_date, end_date, save_xml):
-    db = Database(db_path='resources/tenders.db')
+    db = Database(db_path='resources/tenders_stage.db')
     
     current_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -293,8 +319,10 @@ def download_tenders(regions, start_date, end_date, save_xml):
                         "okpd2_code": tender_info['okpd2_code'],
                         "publish_date": tender_info['publish_date'],
                         "end_date": tender_info['end_date'],
+                        'results_date': tender_info['results_date'],
                         "customer_inn": tender_info['customer_inn'],
-                        "customer_name": tender_info['customer_name']
+                        "customer_name": tender_info['customer_name'],
+                        "stage": tender_info['stage']
                     }
                     for tender_id, tender_info in tenders_info.items()
                 ]

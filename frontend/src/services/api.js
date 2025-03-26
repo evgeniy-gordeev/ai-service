@@ -19,69 +19,40 @@ const sanitizeQueryString = (str) => {
   return str.replace(/['"\\]/g, '');
 };
 
-export const searchTenders = async (query, regionCode = null, tenderCount = 10) => {
+export const searchTenders = async (query, region, startDate, endDate) => {
   try {
-    // Очищаем запрос от кавычек и других проблемных символов
-    const sanitizedQuery = sanitizeQueryString(query);
-    
-    console.log(`Отправка POST-запроса с запросом: ${sanitizedQuery}, регион: ${regionCode}, количество: ${tenderCount}`);
-    
-    // Формируем тело запроса
-    const requestBody = {
-      query: sanitizedQuery,
-      top_k: tenderCount
-    };
-    
-    // Добавляем код региона, если он задан
-    if (regionCode) {
-      requestBody.region = regionCode;
-    }
-    
-    const response = await fetch(API_URL, {
+    const response = await fetch(`${API_URL}/search-tenders/`, {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        query,
+        region,
+        start_date: startDate,
+        end_date: endDate,
+      }),
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Ошибка сети: ${response.status} ${response.statusText}`);
+      throw new Error('Ошибка при поиске тендеров');
     }
-    
+
     const data = await response.json();
-    console.log('Ответ API:', data);
-    
-    // Обработка данных
-    if (!Array.isArray(data)) {
-      console.error('API вернул не массив:', data);
-      throw new Error('Неверный формат данных');
-    }
-    
-    return data.map(tender => ({
-      id: tender.id || tender.tender_id || "ИД-" + Math.random().toString(36).substr(2, 9),
-      title: tender.name || tender.title || tender.description || "Тендер без названия",
-      price: parseFloat(tender.price || tender.max_price || 0),
-      date: tender.publish_date ? 
-        new Date(tender.publish_date).toLocaleDateString('ru-RU') : 
-        new Date().toLocaleDateString('ru-RU'),
-      customer: tender.customer_name || tender.customer || "Неизвестный заказчик",
-      region: tender.region || regionCode || null,
-      score: tender.similarity_score !== undefined ? parseFloat(tender.similarity_score).toFixed(2) : null
+    console.log('API Response:', data);
+
+    return data.tenders.map(tender => ({
+      id: tender.id,
+      name: tender.name,
+      price: tender.price,
+      customer: tender.customer_name,
+      region: tender.region,
+      publishDate: tender.publish_date,
+      stage: tender.stage || "Не указан",
+      score: tender.score || 0
     }));
-    
   } catch (error) {
-    console.error('Ошибка при получении данных:', error);
-    // Возвращаем фиктивные данные для отображения
-    return [
-      {
-        id: 'ERROR-001',
-        title: `Не удалось получить данные: ${error.message}`,
-        price: 0,
-        date: new Date().toLocaleDateString('ru-RU'),
-        customer: 'Ошибка API'
-      }
-    ];
+    console.error('Ошибка при поиске тендеров:', error);
+    throw error;
   }
 }; 

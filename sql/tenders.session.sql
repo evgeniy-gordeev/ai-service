@@ -1,1 +1,1 @@
-select * from tenders WHERE date_added = '2025-03-19' limit 2
+select * from tenders WHERE date_added = '2025-03-22'
