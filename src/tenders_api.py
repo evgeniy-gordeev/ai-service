@@ -86,7 +86,7 @@ class SearchRequest(BaseModel):
 
 class Database:
     def __init__(self):
-        self.db_path = "resources/tenders_stage.db"
+        self.db_path = "resources/tenders.db"
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
@@ -106,8 +106,7 @@ class Database:
             customer_inn,
             customer_name,
             region,
-            date_added,
-            stage
+            date_added
         FROM tenders 
         WHERE region = ? 
         AND date_added BETWEEN ? AND ?
