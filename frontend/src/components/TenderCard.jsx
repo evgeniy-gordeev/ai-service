@@ -74,7 +74,7 @@ const TenderCard = ({ tender, onRemove }) => {
             <i className="calendar-icon"></i>
             Дата публикации:
           </span>
-          <span className="detail-value">{formatDate(tender.date)}</span>
+          <span className="detail-value">{formatDate(tender.publish_date)}</span>
         </div>
       </div>
     </div>

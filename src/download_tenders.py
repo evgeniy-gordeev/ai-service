@@ -274,7 +274,7 @@ def get_tenders_info(files_content):
 
 
 def download_tenders(regions, start_date, end_date, save_xml):
-    db = Database(db_path='resources/tenders_stage.db')
+    db = Database(db_path='resources/tenders_stage_2.db')
     
     current_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -330,7 +330,7 @@ def download_tenders(regions, start_date, end_date, save_xml):
                 inserted_count = db.insert_tenders(date_tenders, region, date_str)
                 logger.info(f"Inserted {inserted_count} tenders for region {region} date {date_str}")
 
-def create_tender_embeddings(model_type: ModelType = ModelType.roberta):
+def create_tender_embeddings___(model_type: ModelType = ModelType.roberta):
     try:
         db = Database()
         model = ModelFactory.get_model(model_type)

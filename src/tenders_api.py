@@ -25,7 +25,7 @@ model = 0  # ModelFactory.get_model(ModelType.roberta)
 
 # Ensure resources directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-db = Database()
+db = Database('tenders_stage.db')
 app = FastAPI(
     title="Tenders Search API",
     description="API for downloading and searching tenders from zakupki.gov.ru",
@@ -363,6 +363,7 @@ async def search_tenders(request: SearchRequest):
                 'customer_inn': tender.get('customer_inn'),
                 'customer_name': tender.get('customer_name'),
                 'region': tender.get('region'),
+                'stage': tender.get('stage'),
                 'similarity_score': float(similarity_score)
             })
             i += 1

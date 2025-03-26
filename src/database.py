@@ -149,7 +149,7 @@ class Database:
                     id, name, price, law_type, purchase_method, 
                     okpd2_code, publish_date, end_date, results_date,
                     customer_inn, customer_name, 
-                    region, date_added, vector, vector_customer_name, vectors_gigachat
+                    region, date_added, vector, vector_customer_name, vectors_gigachat, stage
                 FROM tenders
                 WHERE 1=1
             """
@@ -167,7 +167,7 @@ class Database:
             
             # Add publish_date filter if provided
             if date is not None:
-                query += " AND publish_date > ?"
+                query += " AND date_added > ?"
                 params.append(date)
             
             # Add price filters if provided
@@ -241,7 +241,8 @@ class Database:
                     'date_added': row[12],
                     'vector': np.frombuffer(row[13], dtype=np.float32) if row[13] is not None else None,
                     'vector_customer_name': np.frombuffer(row[14], dtype=np.float32) if row[14] is not None else None,
-                    'vectors_gigachat': np.frombuffer(row[15], dtype=np.float64) if row[15] is not None else None
+                    'vectors_gigachat': np.frombuffer(row[15], dtype=np.float64) if row[15] is not None else None,
+                    'stage': row[16]
                 }
                 for row in cursor.fetchall()
             ]

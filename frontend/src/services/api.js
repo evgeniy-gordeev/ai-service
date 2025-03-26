@@ -63,9 +63,7 @@ export const searchTenders = async (query, regionCode = null, tenderCount = 10) 
       id: tender.id || tender.tender_id || "ИД-" + Math.random().toString(36).substr(2, 9),
       title: tender.name || tender.title || tender.description || "Тендер без названия",
       price: parseFloat(tender.price || tender.max_price || 0),
-      date: tender.publish_date ? 
-        new Date(tender.publish_date).toLocaleDateString('ru-RU') : 
-        new Date().toLocaleDateString('ru-RU'),
+      publish_date: tender.publish_date,
       customer: tender.customer_name || tender.customer || "Неизвестный заказчик",
       region: tender.region || regionCode || null,
       stage: tender.stage || tender.purchase_type || "Не указан",
